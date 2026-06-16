@@ -128,5 +128,43 @@ Mode **fond d'écran** : un geste masque toute l'UI ; ne reste que l'eau vivante
 ## Fichiers
 
 - `DESIGN.md` — ce document.
-- `index.html` — maquette interactive auto-contenue (3 écrans, bascule jour/nuit,
-  panneau de réglages, état vide). Ouvrir dans un navigateur.
+- `index.html` — **moteur WebGL temps réel** (la version réaliste, ci-dessous).
+- `styleguide.html` — maquette flat de référence (tokens, 3 écrans, jour/nuit).
+
+---
+
+## 8. Moteur WebGL (`index.html`)
+
+Implémentation temps réel auto-contenue, sans dépendance externe (les polices
+Google sont décoratives, fallback `system-ui`). Rendu en plusieurs passes :
+
+**Pipeline de rendu**
+1. **Fond** (fragment shader plein écran) : dégradé d'eau jour/nuit + **caustiques**
+   itératives (domaine ondulé, dérive lente) atténuées vers le fond + **god rays**
+   diagonaux + grain de profondeur.
+2. **Poissons** : vrais maillages (triangle strip de 72 segments) générés par espèce.
+   Le vertex shader applique l'**ondulation de la colonne** — onde sinusoïdale voyageant
+   queue→tête, amplitude max à la queue, **synchronisée à la vitesse**. Cap/miroir gérés
+   pour garder le ventre vers le bas. Brume de profondeur + bords adoucis = **flou de profondeur**.
+3. **Bulles & nourriture** : points additifs (glow).
+4. **Post-traitement** : scène → FBO, extraction des hautes lumières → **bloom** séparable
+   (demi-résolution) → composite avec tone-mapping doux, vignette et grain.
+
+**Simulation**
+- **Boids** par espèce : séparation / alignement / cohésion + errance + maintien dans
+  le cadre. Les **Vifs** forment des nuées serrées et rapides ; **Voile** et **Planeur**
+  restent lents et solitaires ; le **Planeur** patrouille le fond (`band`).
+- **Nourrir** : lâche des granulés qui coulent ; les poissons proches passent en
+  comportement d'approche et les « mangent » (petite bulle à la clé).
+
+**Réglages live** : Vitesse (limite de vélocité + cadence de queue), Densité
+(0–60 poissons, recomposés à la volée), Thème (couleurs/caustiques/rays interpolés
+en douceur). **Double-clic** = mode fond d'écran (UI masquée). L'**état vide / nuit**
+= densité 0 + thème nuit.
+
+**Perf** : `requestAnimationFrame`, `devicePixelRatio` plafonné à 1.75, bloom en
+demi-résolution, boids O(n²) borné (n ≤ 60). Repli gracieux si WebGL absent → lien
+vers `styleguide.html`.
+
+> Tous les tokens visuels restent centralisés : `:root` (UI) et la table `THEMES` /
+> `SPECIES` en tête de script (couleurs, vitesses, profils de silhouette).
